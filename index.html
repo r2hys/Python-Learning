@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>リス — R2HYS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Shippori+Mincho+B1:wght@500;700;800&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --void: #04020a;
+    --abyss: #0a0518;
+    --bruise: #170a2e;
+    --bruise-2: #2a1248;
+    --moonlight: #e9d4a3;
+    --gold: #d4a945;
+    --gold-bright: #f4cb6b;
+    --blood: #6b0014;
+    --crimson: #c8102e;
+    --crimson-glow: #ff2a3f;
+    --mist: #6b5b8a;
+    --ink: #efe4cc;
+    --paper: #d8c9a9;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* Skip link */
+  .skip-link {
+    position: fixed;
+    top: -100px;
+    left: 16px;
+    z-index: 9999;
+    padding: 8px 16px;
+    background: var(--crimson);
+    color: var(--ink);
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    border-radius: 2px;
+    text-decoration: none;
+    transition: top 0.2s;
+  }
+  .skip-link:focus { top: 16px; }
+
+  html, body {
+    background: radial-gradient(ellipse at 50% 30%, var(--bruise) 0%, var(--abyss) 40%, var(--void) 100%);
+    color: var(--ink);
+    font-family: 'Cormorant Garamond', serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+    cursor: none;
+  }
+
+  /* ---------- Focus ring ---------- */
+  :focus-visible {
+    outline: 2px solid var(--crimson);
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(200,16,46,0.25), 0 0 12px rgba(212,169,69,0.3);
+    border-radius: 2px;
+  }
+
+  /* ---------- Custom cursor ---------- */
+  #cursor-ring {
+    position: fixed;
+    width: 28px;
+    height: 28px;
+    border: 1.5px solid var(--gold);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9998;
+    transform: translate(-50%, -50%);
+    transition: width 0.2s, height 0.2s, border-color 0.2s, opacity 0.2s;
+    mix-blend-mode: screen;
+  }
+  #cursor-dot {
+    position: fixed;
+    width: 5px;
+    height: 5px;
+    background: var(--crimson-glow);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 6px var(--crimson-glow);
+  }
+  body:has(a:hover) #cursor-ring {
+    width: 44px;
+    height: 44px;
+    border-color: var(--crimson-glow);
+  }
+  @keyframes trail-fade {
+    0%   { opacity: 0.6; transform: translate(-50%,-50%) scale(1); }
+    100% { opacity: 0;   transform: translate(-50%,-50%) scale(0.2); }
+  }
+  .cursor-trail {
+    position: fixed;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9997;
+    transform: translate(-50%, -50%);
+    animation: trail-fade 0.55s ease-out forwards;
+    background: var(--crimson);
+    box-shadow: 0 0 4px var(--crimson);
+  }
+
+  /* ---------- Intro overlay ---------- */
+  #intro {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: var(--void);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    transition: opacity 0.7s ease;
+  }
+  #intro.fade-out { opacity: 0; pointer-events: none; }
+  .intro-line {
+    width: 1px;
+    height: 0;
+    background: linear-gradient(180deg, transparent, var(--gold) 50%, transparent);
+    transition: height 0.8s ease;
+  }
+  .intro-line.open { height: 80px; }
+  .intro-kanji {
+    font-family: 'Shippori Mincho B1', serif;
+    font-weight: 800;
+    font-size: clamp(28px, 6vw, 52px);
+    letter-spacing: 0.9em;
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(212,169,69,0.7), 0 0 60px rgba(212,169,69,0.3);
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    padding-left: 0.9em;
+  }
+  .intro-kanji.show { opacity: 1; transform: translateY(0); }
+  .intro-sub {
+    font-family: 'Cinzel', serif;
+    font-weight: 500;
+    font-size: clamp(10px, 1.5vw, 13px);
+    letter-spacing: 0.55em;
+    color: var(--mist);
+    opacity: 0;
+    transition: opacity 0.6s ease 0.2s;
+    padding-left: 0.55em;
+  }
+  .intro-sub.show { opacity: 1; }
+
+  /* ---------- Three.js Canvas Background ---------- */
+  #bg {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* ---------- Film grain overlay ---------- */
+  .grain {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0.08;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.6'/></svg>");
+  }
+
+  /* ---------- Vignette ---------- */
+  .vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.6) 80%, rgba(0,0,0,0.95) 100%);
+  }
+
+  /* ---------- Slash animations across screen ---------- */
+  .slash-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .slash-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+  .slash-path {
+    fill: none;
+    stroke-linecap: round;
+    filter:
+      drop-shadow(0 0 4px rgba(255,42,63,0.85))
+      drop-shadow(0 0 12px rgba(244,203,107,0.45))
+      drop-shadow(0 0 28px rgba(200,16,46,0.4));
+  }
+
+  /* ---------- Main container ---------- */
+  main {
+    position: relative;
+    z-index: 4;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 60px 24px 80px;
+    text-align: center;
+  }
+
+  /* ---------- Top kanji header ---------- */
+  .upper-kanji {
+    font-family: 'Shippori Mincho B1', serif;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 1.2em;
+    color: var(--gold);
+    opacity: 0;
+    animation: fade-down 1.6s 3.3s forwards;
+    text-shadow: 0 0 14px rgba(212,169,69,0.6);
+    margin-bottom: 8px;
+    padding-left: 1.2em;
+  }
+  .upper-divider {
+    width: 1px;
+    height: 60px;
+    background: linear-gradient(180deg, transparent, var(--gold) 50%, transparent);
+    margin: 0 auto 36px;
+    opacity: 0;
+    animation: fade-down 1.6s 3.6s forwards;
+  }
+
+  @keyframes fade-down {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ---------- The Six Eyes ---------- */
+  .face {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 38px;
+    justify-content: center;
+    align-items: center;
+    padding: 30px 0 40px;
+    perspective: 1200px;
+  }
+  .eye-column {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .eye-column.left  { transform: rotateY(8deg); }
+  .eye-column.right { transform: rotateY(-8deg); }
+
+  .eye-wrap {
+    width: 104px;
+    height: 64px;
+    position: relative;
+    opacity: 0;
+    animation: eye-open 1.4s forwards;
+    filter: drop-shadow(0 0 18px rgba(255,42,63,0.45)) drop-shadow(0 0 6px rgba(212,169,69,0.4));
+  }
+  .eye-wrap.small {
+    width: 80px;
+    height: 50px;
+  }
+
+  .eye-column.left  .eye-wrap:nth-child(1) { animation-delay: 4.0s; }
+  .eye-column.left  .eye-wrap:nth-child(2) { animation-delay: 4.15s; }
+  .eye-column.left  .eye-wrap:nth-child(3) { animation-delay: 4.3s; }
+  .eye-column.right .eye-wrap:nth-child(1) { animation-delay: 4.0s; }
+  .eye-column.right .eye-wrap:nth-child(2) { animation-delay: 4.15s; }
+  .eye-column.right .eye-wrap:nth-child(3) { animation-delay: 4.3s; }
+
+  @keyframes eye-open {
+    0%   { opacity: 0; transform: scaleY(0.05); }
+    60%  { opacity: 1; transform: scaleY(1.05); }
+    100% { opacity: 1; transform: scaleY(1); }
+  }
+
+  .eye-svg { width: 100%; height: 100%; overflow: visible; }
+  .eye-iris-grp { transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+  @keyframes iris-pulse {
+    0%, 100% { filter: brightness(1); }
+    50%       { filter: brightness(1.3); }
+  }
+  .eye-iris-glow { animation: iris-pulse 3.4s ease-in-out infinite; }
+
+  @keyframes vein-pulse {
+    0%, 100% { opacity: 0.78; filter: brightness(1); }
+    10%  { opacity: 1;    filter: brightness(1.7)  drop-shadow(0 0 1.5px rgba(255,40,60,0.85)); }
+    20%  { opacity: 0.55; filter: brightness(0.85); }
+    32%  { opacity: 1;    filter: brightness(1.85) drop-shadow(0 0 2.2px rgba(255,40,60,0.95)); }
+    46%  { opacity: 0.7;  filter: brightness(0.95); }
+  }
+  .eye-veins-outer, .eye-veins-inner {
+    animation: vein-pulse 2.4s ease-in-out infinite;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .eye-column     .eye-wrap:nth-child(1) .eye-veins-outer,
+  .eye-column     .eye-wrap:nth-child(1) .eye-veins-inner { animation-delay: 0s; }
+  .eye-column     .eye-wrap:nth-child(2) .eye-veins-outer,
+  .eye-column     .eye-wrap:nth-child(2) .eye-veins-inner { animation-delay: -0.7s; }
+  .eye-column     .eye-wrap:nth-child(3) .eye-veins-outer,
+  .eye-column     .eye-wrap:nth-child(3) .eye-veins-inner { animation-delay: -1.4s; }
+  .eye-column.right .eye-wrap:nth-child(1) .eye-veins-outer,
+  .eye-column.right .eye-wrap:nth-child(1) .eye-veins-inner { animation-delay: -0.35s; }
+  .eye-column.right .eye-wrap:nth-child(3) .eye-veins-outer,
+  .eye-column.right .eye-wrap:nth-child(3) .eye-veins-inner { animation-delay: -1.05s; }
+
+  /* ---------- Names ---------- */
+  .name-jp {
+    font-family: 'Shippori Mincho B1', serif;
+    font-weight: 800;
+    font-size: clamp(56px, 10vw, 92px);
+    letter-spacing: 0.18em;
+    line-height: 1;
+    color: var(--ink);
+    margin-top: 26px;
+    text-shadow:
+      0 0 30px rgba(255,42,63,0.35),
+      0 0 80px rgba(255,42,63,0.15),
+      0 2px 0 rgba(0,0,0,0.6);
+    opacity: 0;
+    animation: fade-down 2s 4.4s forwards;
+    padding-left: 0.18em;
+  }
+  .name-jp .red-stroke {
+    background: linear-gradient(180deg, var(--ink) 0%, var(--ink) 60%, var(--crimson) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  .name-en {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: clamp(13px, 2vw, 17px);
+    letter-spacing: 0.85em;
+    color: var(--gold);
+    margin-top: 18px;
+    opacity: 0;
+    animation: fade-down 2s 4.7s forwards;
+    padding-left: 0.85em;
+  }
+  .name-en::before, .name-en::after {
+    content: '◆';
+    margin: 0 0.6em;
+    font-size: 0.7em;
+    color: var(--crimson);
+    letter-spacing: normal;
+    vertical-align: 0.2em;
+  }
+
+  /* ---------- Waveform ---------- */
+  .waveform {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 28px;
+    margin: 16px auto 0;
+    opacity: 0;
+    animation: fade-down 1.5s 4.9s forwards;
+  }
+  .waveform span {
+    display: block;
+    width: 2px;
+    border-radius: 2px;
+    animation: wave-bar 1.4s ease-in-out infinite alternate;
+  }
+  @keyframes wave-bar {
+    0%   { transform: scaleY(0.15); }
+    100% { transform: scaleY(1); }
+  }
+
+  .subtitle {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-weight: 300;
+    font-size: clamp(15px, 1.8vw, 19px);
+    letter-spacing: 0.12em;
+    color: var(--mist);
+    margin-top: 12px;
+    opacity: 0;
+    animation: fade-down 2s 5.0s forwards;
+  }
+  .subtitle .sep { color: var(--crimson); margin: 0 0.7em; opacity: 0.7; }
+  .subtitle .jp {
+    font-family: 'Shippori Mincho B1', serif;
+    font-weight: 500;
+    color: var(--moonlight);
+    margin-left: 0.6em;
+    letter-spacing: 0.3em;
+  }
+
+  /* ---------- Links section ---------- */
+  .links-header {
+    margin-top: 70px;
+    margin-bottom: 28px;
+    opacity: 0;
+    animation: fade-down 1.5s 5.4s forwards;
+  }
+  .links-header .line {
+    display: inline-block;
+    width: 80px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    vertical-align: middle;
+  }
+  .links-header .label {
+    font-family: 'Cinzel', serif;
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.6em;
+    color: var(--gold);
+    margin: 0 18px;
+    vertical-align: middle;
+    text-shadow: 0 0 10px rgba(212,169,69,0.5);
+  }
+
+  .links {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .link-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    min-height: 68px;
+    text-decoration: none;
+    color: var(--ink);
+    background: linear-gradient(135deg, rgba(23,10,46,0.7) 0%, rgba(10,5,24,0.85) 100%);
+    border: 1px solid rgba(212,169,69,0.18);
+    border-radius: 2px;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    will-change: transform;
+    opacity: 0;
+    animation: card-in 1s forwards;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .link-card:nth-child(1) { animation-delay: 5.6s; }
+  .link-card:nth-child(2) { animation-delay: 5.7s; }
+  .link-card:nth-child(3) { animation-delay: 5.8s; }
+  .link-card:nth-child(4) { animation-delay: 5.9s; }
+  .link-card:nth-child(5) { animation-delay: 6.0s; }
+  .link-card:nth-child(6) { animation-delay: 6.1s; }
+
+  @keyframes card-in {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Corner ornaments */
+  .link-card::before, .link-card::after {
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-color: var(--gold);
+    border-style: solid;
+    transition: all 0.3s ease;
+    pointer-events: none;
+  }
+  .link-card::before { top: 6px; left: 6px; border-width: 1px 0 0 1px; }
+  .link-card::after  { bottom: 6px; right: 6px; border-width: 0 1px 1px 0; }
+
+  /* Upgraded shimmer — sword-draw light sweep */
+  .link-card .shimmer {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 30%,
+      rgba(255,42,63,0.12) 42%,
+      rgba(244,203,107,0.28) 50%,
+      rgba(255,42,63,0.12) 58%,
+      transparent 70%,
+      transparent 100%
+    );
+    background-size: 250% 100%;
+    background-position: 200% 0;
+    transition: background-position 0.75s ease;
+    pointer-events: none;
+  }
+  .link-card:hover .shimmer { background-position: -50% 0; }
+
+  .link-card:hover {
+    border-color: var(--crimson);
+    box-shadow:
+      0 0 0 1px rgba(200,16,46,0.4) inset,
+      0 0 30px rgba(255,42,63,0.35),
+      0 8px 40px rgba(0,0,0,0.6);
+  }
+  .link-card:hover::before, .link-card:hover::after {
+    width: 18px;
+    height: 18px;
+    border-color: var(--crimson);
+  }
+
+  .link-icon {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle, rgba(212,169,69,0.12) 0%, transparent 70%);
+    border-radius: 50%;
+    transition: transform 0.4s ease;
+  }
+  .link-card:hover .link-icon { transform: rotate(8deg) scale(1.1); }
+  .link-icon svg { width: 20px; height: 20px; }
+
+  .link-text {
+    flex: 1;
+    text-align: left;
+    min-width: 0;
+  }
+  .link-text .platform {
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.25em;
+    color: var(--moonlight);
+    text-transform: uppercase;
+    transition: color 0.3s;
+  }
+  .link-text .handle {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 14px;
+    color: var(--mist);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .link-card:hover .platform { color: var(--gold-bright); }
+
+  .link-arrow {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    color: var(--gold);
+    opacity: 0.5;
+    transition: all 0.3s ease;
+  }
+  .link-card:hover .link-arrow {
+    opacity: 1;
+    color: var(--crimson-glow);
+    transform: translateX(4px);
+  }
+
+  .link-icon.spotify   { color: #1ed760; }
+  .link-icon.instagram { color: #e1306c; }
+  .link-icon.tiktok    { color: #25f4ee; }
+  .link-icon.discord   { color: #7289da; }
+  .link-icon.youtube   { color: #ff3838; }
+  .link-icon.twitter   { color: #ffffff; }
+
+  /* ---------- Footer ornament ---------- */
+  .footer-ornament {
+    margin-top: 80px;
+    text-align: center;
+    opacity: 0;
+    animation: fade-down 2s 6.4s forwards;
+  }
+  .crescent-svg {
+    width: 60px;
+    height: 60px;
+    color: var(--gold);
+    filter: drop-shadow(0 0 14px rgba(212,169,69,0.5));
+    animation: crescent-rotate 28s linear infinite;
+  }
+  @keyframes crescent-rotate {
+    from { transform: rotate(0); }
+    to   { transform: rotate(360deg); }
+  }
+  .footer-text {
+    font-family: 'Shippori Mincho B1', serif;
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.6em;
+    color: var(--mist);
+    margin-top: 18px;
+    padding-left: 0.6em;
+  }
+  .footer-text .em { color: var(--crimson); opacity: 0.8; }
+
+  /* ---------- Custom selection ---------- */
+  ::selection { background: var(--crimson); color: var(--ink); }
+
+  /* ---------- Mobile ---------- */
+  @media (max-width: 480px) {
+    main { padding: 40px 16px 60px; }
+    .face { gap: 22px; padding: 20px 0 28px; }
+    .eye-wrap       { width: 82px; height: 50px; }
+    .eye-wrap.small { width: 62px; height: 38px; }
+    .eye-column { gap: 16px; }
+    .name-jp { letter-spacing: 0.08em; }
+    .links-header { margin-top: 48px; }
+    .link-card { padding: 14px 16px; }
+  }
+
+  /* ---------- Reduced motion ---------- */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    #intro { display: none !important; }
+    #cursor-ring, #cursor-dot { display: none; }
+    body { cursor: crosshair; }
+  }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#links">Skip to socials</a>
+
+<!-- Intro overlay -->
+<div id="intro" role="presentation" aria-hidden="true">
+  <div class="intro-line" id="intro-line-top"></div>
+  <div class="intro-kanji" id="intro-kanji">上弦の壱</div>
+  <div class="intro-sub" id="intro-sub">UPPER MOON ONE</div>
+  <div class="intro-line" id="intro-line-bot"></div>
+</div>
+
+<!-- Custom cursor -->
+<div id="cursor-ring" aria-hidden="true"></div>
+<div id="cursor-dot"  aria-hidden="true"></div>
+
+<canvas id="bg" aria-hidden="true"></canvas>
+<div class="vignette" aria-hidden="true"></div>
+<div class="slash-layer" aria-hidden="true">
+  <svg class="slash-svg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <linearGradient id="slashGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%"   stop-color="#c8102e" stop-opacity="0"/>
+        <stop offset="14%"  stop-color="#c8102e" stop-opacity="0.65"/>
+        <stop offset="50%"  stop-color="#fff5d8" stop-opacity="1"/>
+        <stop offset="86%"  stop-color="#c8102e" stop-opacity="0.65"/>
+        <stop offset="100%" stop-color="#c8102e" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+  </svg>
+</div>
+<div class="grain" aria-hidden="true"></div>
+
+<main role="main">
+  <div class="upper-kanji" aria-label="Upper Moon One in Japanese">上 弦 の 壱</div>
+  <div class="upper-divider" aria-hidden="true"></div>
+
+  <div class="face" id="face" aria-hidden="true">
+    <div class="eye-column left">
+      <div class="eye-wrap small" data-kanji="上"></div>
+      <div class="eye-wrap"       data-kanji="弦"></div>
+      <div class="eye-wrap small" data-kanji="壱"></div>
+    </div>
+    <div class="eye-column right">
+      <div class="eye-wrap small" data-kanji="上"></div>
+      <div class="eye-wrap"       data-kanji="弦"></div>
+      <div class="eye-wrap small" data-kanji="壱"></div>
+    </div>
+  </div>
+
+  <h1 class="name-jp"><span class="red-stroke">月夜</span></h1>
+  <h2 class="name-en">R 2 H Y S</h2>
+
+  <div class="waveform" aria-hidden="true" id="waveform"></div>
+
+  <p class="subtitle">
+    私 <span class="sep">·</span> 愛 <span class="sep">·</span> エリー
+    <span class="jp" aria-hidden="true">❤️</span>
+  </p>
+
+  <div class="links-header" aria-hidden="true">
+    <span class="line"></span>
+    <span class="label">SOCIALS</span>
+    <span class="line"></span>
+  </div>
+
+  <div class="links" id="links">
+
+    <a href="https://open.spotify.com/user/r9rai13h5uackunx2eaevqvnj?si=558dc41362a94bf6"
+       class="link-card" data-platform="spotify"
+       aria-label="Open Spotify profile" target="_blank" rel="noopener noreferrer">
+      <span class="shimmer" aria-hidden="true"></span>
+      <span class="link-icon spotify" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12C24 5.4 18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+      </span>
+      <span class="link-text">
+        <div class="platform">Spotify</div>
+        <div class="handle">r2hys</div>
+      </span>
+      <svg class="link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    </a>
+
+    <a href="https://www.instagram.com/r4hys?igsh=MWhsajJoOGZvcGNwag%3D%3D&utm_source=qr"
+       class="link-card" data-platform="instagram"
+       aria-label="Open Instagram profile" target="_blank" rel="noopener noreferrer">
+      <span class="shimmer" aria-hidden="true"></span>
+      <span class="link-icon instagram" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.6" fill="currentColor"/></svg>
+      </span>
+      <span class="link-text">
+        <div class="platform">Instagram</div>
+        <div class="handle">@r4hys</div>
+      </span>
+      <svg class="link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    </a>
+
+    <a href="https://www.tiktok.com/@r2hys?_r=1&_t=ZN-96CGKrD2JNO"
+       class="link-card" data-platform="tiktok"
+       aria-label="Open TikTok profile" target="_blank" rel="noopener noreferrer">
+      <span class="shimmer" aria-hidden="true"></span>
+      <span class="link-icon tiktok" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43V8.42a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.84-.36z"/></svg>
+      </span>
+      <span class="link-text">
+        <div class="platform">TikTok</div>
+        <div class="handle">@r2hys</div>
+      </span>
+      <svg class="link-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+    </a>
+
+  </div>
+
+  <div class="footer-ornament" aria-hidden="true">
+    <svg class="crescent-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <radialGradient id="moonGrad" cx="60%" cy="40%">
+          <stop offset="0%"   stop-color="#f4cb6b"/>
+          <stop offset="60%"  stop-color="#d4a945"/>
+          <stop offset="100%" stop-color="#6b4a18"/>
+        </radialGradient>
+      </defs>
+      <path d="M 50 10 A 40 40 0 1 0 50 90 A 30 35 0 1 1 50 10 Z" fill="url(#moonGrad)" opacity="0.85"/>
+    </svg>
+    <div class="footer-text">月 <span class="em">の</span> 呼 <span class="em">吸</span></div>
+  </div>
+
+</main>
+
+<template id="eye-template">
+  <svg class="eye-svg" viewBox="0 0 100 60" overflow="visible" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <defs>
+      <radialGradient id="sclera-grad-PLACEHOLDER" cx="50%" cy="50%" r="60%">
+        <stop offset="0%"   stop-color="#ff5566"/>
+        <stop offset="50%"  stop-color="#c8102e"/>
+        <stop offset="100%" stop-color="#3a0008"/>
+      </radialGradient>
+      <radialGradient id="iris-grad-PLACEHOLDER" cx="50%" cy="50%" r="50%">
+        <stop offset="0%"   stop-color="#ffe89a"/>
+        <stop offset="35%"  stop-color="#f5b545"/>
+        <stop offset="70%"  stop-color="#d6781a"/>
+        <stop offset="100%" stop-color="#5b2810"/>
+      </radialGradient>
+      <filter id="eyeGlow-PLACEHOLDER" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="2.5" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <clipPath id="eyeClip-PLACEHOLDER">
+        <path d="M 5 30 Q 50 -5 95 30 Q 50 65 5 30 Z"/>
+      </clipPath>
+    </defs>
+    <path class="eye-iris-glow" d="M 5 30 Q 50 -5 95 30 Q 50 65 5 30 Z"
+          fill="none" stroke="#c8102e" stroke-width="1.4" opacity="0.55"
+          filter="url(#eyeGlow-PLACEHOLDER)"/>
+    <g class="eye-veins-outer" stroke-linecap="round" fill="none">
+      <path d="M 95 30 Q 102 27 110 24 Q 117 21 124 19" stroke="#5a0010" stroke-width="0.7" opacity="0.85"/>
+      <path d="M 95 30 Q 103 33 110 37 Q 117 40 123 42" stroke="#5a0010" stroke-width="0.7" opacity="0.85"/>
+      <path d="M 95 30 Q 105 30 116 31 Q 122 31.5 128 32" stroke="#3a0008" stroke-width="0.5" opacity="0.75"/>
+      <path d="M 110 24 Q 113 21 117 17" stroke="#4a000c" stroke-width="0.4" opacity="0.7"/>
+      <path d="M 110 24 Q 112 27 113 31" stroke="#4a000c" stroke-width="0.35" opacity="0.65"/>
+      <path d="M 110 37 Q 113 41 116 46" stroke="#4a000c" stroke-width="0.4" opacity="0.7"/>
+      <path d="M 116 31 Q 121 30 125 27" stroke="#3a0008" stroke-width="0.3" opacity="0.6"/>
+      <path d="M 117 17 Q 120 14 124 11" stroke="#3a0008" stroke-width="0.25" opacity="0.5"/>
+      <path d="M 116 46 Q 119 49 121 52" stroke="#3a0008" stroke-width="0.25" opacity="0.5"/>
+      <path d="M 124 19 Q 128 18 132 17" stroke="#3a0008" stroke-width="0.22" opacity="0.45"/>
+      <path d="M 5 30 Q -2 27 -10 24 Q -17 21 -23 19" stroke="#5a0010" stroke-width="0.65" opacity="0.8"/>
+      <path d="M 5 30 Q -2 33 -10 37 Q -17 40 -22 42" stroke="#5a0010" stroke-width="0.65" opacity="0.8"/>
+      <path d="M 5 30 Q -5 31 -14 32" stroke="#3a0008" stroke-width="0.45" opacity="0.7"/>
+      <path d="M -10 24 Q -13 21 -17 17" stroke="#4a000c" stroke-width="0.35" opacity="0.65"/>
+      <path d="M -10 37 Q -13 40 -16 44" stroke="#4a000c" stroke-width="0.35" opacity="0.65"/>
+      <path d="M -14 32 Q -19 33 -23 35" stroke="#3a0008" stroke-width="0.3" opacity="0.55"/>
+      <path d="M 50 5 Q 51 0 53 -4"  stroke="#4a000c" stroke-width="0.35" opacity="0.6"/>
+      <path d="M 60 6 Q 63 1 66 -3"  stroke="#4a000c" stroke-width="0.3"  opacity="0.55"/>
+      <path d="M 40 6 Q 38 2 36 -2"  stroke="#4a000c" stroke-width="0.3"  opacity="0.55"/>
+      <path d="M 38 54 Q 36 58 34 62" stroke="#4a000c" stroke-width="0.3" opacity="0.5"/>
+      <path d="M 60 55 Q 62 59 64 62" stroke="#4a000c" stroke-width="0.3" opacity="0.5"/>
+    </g>
+    <g clip-path="url(#eyeClip-PLACEHOLDER)">
+      <rect x="0" y="0" width="100" height="60" fill="url(#sclera-grad-PLACEHOLDER)"/>
+      <g class="eye-veins-inner" stroke="#4a0008" stroke-linecap="round" fill="none" opacity="0.75">
+        <path d="M 8 28 Q 18 26 30 28"  stroke-width="0.4"/>
+        <path d="M 92 28 Q 80 26 70 29" stroke-width="0.4"/>
+        <path d="M 10 35 Q 22 36 32 33" stroke-width="0.35"/>
+        <path d="M 90 35 Q 78 36 68 33" stroke-width="0.35"/>
+        <path d="M 14 22 Q 22 24 28 26" stroke-width="0.3"/>
+        <path d="M 86 22 Q 78 24 72 26" stroke-width="0.3"/>
+        <path d="M 50 8 Q 48 14 47 18"  stroke-width="0.3"/>
+        <path d="M 50 52 Q 52 46 53 42" stroke-width="0.3"/>
+        <path d="M 18 40 Q 26 41 32 38" stroke-width="0.3"/>
+        <path d="M 82 40 Q 74 41 68 38" stroke-width="0.3"/>
+      </g>
+      <g class="eye-iris-grp">
+        <g class="iris-petals" fill="#26000a" opacity="0.95">__PETALS__</g>
+        <circle cx="50" cy="30" r="18" fill="url(#iris-grad-PLACEHOLDER)"/>
+        <circle cx="50" cy="30" r="18" fill="none" stroke="#3a1a08" stroke-width="0.7" opacity="0.85"/>
+        <path class="iris-spokes" d="__SPOKES__"
+              stroke="#7a3008" stroke-width="0.7" stroke-linecap="round"
+              fill="none" opacity="0.88"/>
+        <circle cx="50" cy="30" r="2.4" fill="#0a0204" opacity="0.9"/>
+        <text class="eye-kanji" x="50" y="30" text-anchor="middle" dominant-baseline="central"
+              font-family="'Shippori Mincho B1', serif" font-weight="800" font-size="26"
+              fill="#0a0204" stroke="#0a0204" stroke-width="0.6" paint-order="stroke fill"
+              opacity="0.96">__KANJI__</text>
+        <ellipse cx="42" cy="20" rx="1.6" ry="2.2" fill="#fff" opacity="0.3"/>
+      </g>
+    </g>
+    <path d="M 5 30 Q 50 -5 95 30 Q 50 65 5 30 Z"
+          fill="none" stroke="#0a0205" stroke-width="2" opacity="0.85"/>
+    <path d="M 5 30 Q 50 -5 95 30" fill="none" stroke="#000" stroke-width="3" opacity="0.6"/>
+    <path d="M 8 32 Q 50 60 92 32"  fill="none" stroke="#000" stroke-width="0.6" opacity="0.4"/>
+  </svg>
+</template>
+
+<script>
+/* =========================================================
+   0. Cinematic Intro
+========================================================= */
+(function introSequence() {
+  const intro     = document.getElementById('intro');
+  const kanji     = document.getElementById('intro-kanji');
+  const sub       = document.getElementById('intro-sub');
+  const lineTop   = document.getElementById('intro-line-top');
+  const lineBot   = document.getElementById('intro-line-bot');
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    intro.remove();
+    return;
+  }
+
+  setTimeout(() => {
+    lineTop.classList.add('open');
+    lineBot.classList.add('open');
+  }, 300);
+
+  setTimeout(() => {
+    kanji.classList.add('show');
+    sub.classList.add('show');
+  }, 700);
+
+  setTimeout(() => {
+    // Fire a single dramatic intro slash
+    const svg = document.querySelector('.slash-svg');
+    if (svg) {
+      const SVG_NS = 'http://www.w3.org/2000/svg';
+      const w = window.innerWidth, h = window.innerHeight;
+      const path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', `M -200 ${h * 0.45} A 1200 1200 0 0 1 ${w + 200} ${h * 0.55}`);
+      path.setAttribute('class', 'slash-path');
+      path.setAttribute('stroke', 'url(#slashGrad)');
+      path.setAttribute('stroke-width', '5');
+      svg.appendChild(path);
+      const len = path.getTotalLength();
+      path.style.strokeDasharray = len;
+      path.style.strokeDashoffset = len;
+      path.style.opacity = '0';
+      setTimeout(() => {
+        path.style.transition = 'stroke-dashoffset 0.6s cubic-bezier(0.16,0.84,0.24,1), opacity 0.2s';
+        path.style.opacity = '1';
+        path.style.strokeDashoffset = '0';
+        setTimeout(() => {
+          path.style.transition = 'opacity 0.5s ease-in';
+          path.style.opacity = '0';
+          setTimeout(() => path.remove(), 500);
+        }, 650);
+      }, 20);
+    }
+  }, 1800);
+
+  setTimeout(() => {
+    intro.classList.add('fade-out');
+    setTimeout(() => intro.remove(), 750);
+  }, 2500);
+})();
+
+/* =========================================================
+   1. Custom cursor with particle trail
+========================================================= */
+(function customCursor() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  const ring = document.getElementById('cursor-ring');
+  const dot  = document.getElementById('cursor-dot');
+  let cx = -100, cy = -100;
+  let trailTimer = 0;
+
+  document.addEventListener('mousemove', e => {
+    cx = e.clientX; cy = e.clientY;
+    ring.style.left = cx + 'px';
+    ring.style.top  = cy + 'px';
+    dot.style.left  = cx + 'px';
+    dot.style.top   = cy + 'px';
+
+    // Spawn trail particle every ~40ms
+    const now = Date.now();
+    if (now - trailTimer > 40) {
+      trailTimer = now;
+      const t = document.createElement('span');
+      t.className = 'cursor-trail';
+      t.style.left = cx + 'px';
+      t.style.top  = cy + 'px';
+      t.style.width  = (3 + Math.random() * 4) + 'px';
+      t.style.height = t.style.width;
+      document.body.appendChild(t);
+      t.addEventListener('animationend', () => t.remove());
+    }
+  }, { passive: true });
+
+  document.addEventListener('mouseleave', () => {
+    ring.style.opacity = '0';
+    dot.style.opacity  = '0';
+  });
+  document.addEventListener('mouseenter', () => {
+    ring.style.opacity = '1';
+    dot.style.opacity  = '1';
+  });
+})();
+
+/* =========================================================
+   2. Waveform bars
+========================================================= */
+(function buildWaveform() {
+  const container = document.getElementById('waveform');
+  const barCount  = 24;
+  const heights   = [8,14,20,16,24,12,20,28,18,24,16,28,22,16,26,12,20,24,16,20,14,24,18,10];
+  for (let i = 0; i < barCount; i++) {
+    const s = document.createElement('span');
+    const isGold = i % 4 === 0;
+    s.style.height         = heights[i] + 'px';
+    s.style.background     = isGold ? 'var(--gold)' : 'var(--crimson)';
+    s.style.boxShadow      = isGold
+      ? '0 0 6px rgba(212,169,69,0.6)'
+      : '0 0 6px rgba(200,16,46,0.6)';
+    s.style.animationDelay = (i * 0.065) + 's';
+    s.style.animationDuration = (1.1 + (i % 5) * 0.15) + 's';
+    s.style.transformOrigin = 'bottom';
+    container.appendChild(s);
+  }
+})();
+
+/* =========================================================
+   3. Eye SVG rendering
+========================================================= */
+(function renderEyes() {
+  function buildIrisDecorations() {
+    const cx = 50, cy = 30;
+    const petalCount = 18;
+    const baseR = 17.8;
+    const halfW = 5.5 * Math.PI / 180;
+    let petals = '';
+    for (let p = 0; p < petalCount; p++) {
+      const angle = (p / petalCount) * Math.PI * 2 + Math.PI / petalCount;
+      const tipR  = 23.2 + Math.sin(p * 2.3) * 1.6;
+      const b1x = cx + Math.cos(angle - halfW) * baseR;
+      const b1y = cy + Math.sin(angle - halfW) * baseR;
+      const b2x = cx + Math.cos(angle + halfW) * baseR;
+      const b2y = cy + Math.sin(angle + halfW) * baseR;
+      const tipx = cx + Math.cos(angle) * tipR;
+      const tipy = cy + Math.sin(angle) * tipR;
+      petals += `<polygon points="${b1x.toFixed(2)},${b1y.toFixed(2)} ${b2x.toFixed(2)},${b2y.toFixed(2)} ${tipx.toFixed(2)},${tipy.toFixed(2)}"/>`;
+    }
+    const spokeCount = 28, rIn = 4.8, rOut = 17.2;
+    let spokes = '';
+    for (let s = 0; s < spokeCount; s++) {
+      const angle = (s / spokeCount) * Math.PI * 2;
+      const x1 = cx + Math.cos(angle) * rIn,  y1 = cy + Math.sin(angle) * rIn;
+      const x2 = cx + Math.cos(angle) * rOut, y2 = cy + Math.sin(angle) * rOut;
+      spokes += `M ${x1.toFixed(2)} ${y1.toFixed(2)} L ${x2.toFixed(2)} ${y2.toFixed(2)} `;
+    }
+    return { petals, spokes: spokes.trim() };
+  }
+
+  const tpl   = document.getElementById('eye-template').innerHTML;
+  const decor = buildIrisDecorations();
+  document.querySelectorAll('.eye-wrap').forEach((wrap, i) => {
+    const kanji = wrap.dataset.kanji || '';
+    const uid   = 'eye' + i;
+    const svg   = tpl
+      .replaceAll('PLACEHOLDER', uid)
+      .replace('__KANJI__',  kanji)
+      .replace('__PETALS__', decor.petals)
+      .replace('__SPOKES__', decor.spokes);
+    wrap.innerHTML = svg;
+  });
+})();
+
+/* =========================================================
+   4. Cursor-tracked iris movement
+========================================================= */
+(function trackEyes() {
+  const eyes = Array.from(document.querySelectorAll('.eye-wrap'));
+  let mx = window.innerWidth / 2, my = window.innerHeight / 2;
+  window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; }, { passive: true });
+  function loop() {
+    eyes.forEach(eye => {
+      const grp = eye.querySelector('.eye-iris-grp');
+      if (!grp) return;
+      const r = eye.getBoundingClientRect();
+      const dx = mx - (r.left + r.width / 2);
+      const dy = my - (r.top  + r.height / 2);
+      const dist = Math.hypot(dx, dy);
+      const max  = 8;
+      const tx = (dx / Math.max(dist, 1)) * Math.min(max,       dist / 30);
+      const ty = (dy / Math.max(dist, 1)) * Math.min(max * 0.6, dist / 50);
+      grp.setAttribute('transform', `translate(${tx}, ${ty})`);
+    });
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+/* =========================================================
+   5. Random blinking
+========================================================= */
+(function blinking() {
+  document.querySelectorAll('.eye-wrap').forEach(eye => {
+    function scheduleBlink() {
+      setTimeout(() => {
+        eye.style.transition = 'transform 0.12s';
+        eye.style.transform  = 'scaleY(0.05)';
+        setTimeout(() => {
+          eye.style.transform = 'scaleY(1)';
+          setTimeout(() => { eye.style.transition = ''; }, 140);
+        }, 110);
+        scheduleBlink();
+      }, 4000 + Math.random() * 9000);
+    }
+    scheduleBlink();
+  });
+})();
+
+/* =========================================================
+   6. Magnetic link card effect
+========================================================= */
+(function magneticCards() {
+  const RANGE = 130;
+  document.querySelectorAll('.link-card').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const r  = card.getBoundingClientRect();
+      const cx = r.left + r.width  / 2;
+      const cy = r.top  + r.height / 2;
+      const dx = (e.clientX - cx) / (r.width  / 2);
+      const dy = (e.clientY - cy) / (r.height / 2);
+      card.style.transition = 'transform 0.1s, border-color 0.3s, box-shadow 0.3s';
+      card.style.transform  = `perspective(800px) rotateY(${dx * 9}deg) rotateX(${-dy * 7}deg) translateZ(10px) translate(${dx * 4}px, ${dy * 4}px)`;
+    });
+    card.addEventListener('mouseleave', () => {
+      card.style.transition = 'transform 0.6s cubic-bezier(0.2,0.8,0.2,1), border-color 0.3s, box-shadow 0.3s';
+      card.style.transform  = '';
+    });
+  });
+})();
+
+/* =========================================================
+   7. Moon Breathing — fanning crescent slashes
+========================================================= */
+(function moonBreathing() {
+  const svg = document.querySelector('.slash-svg');
+  if (!svg) return;
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  function fire() {
+    const w = window.innerWidth, h = window.innerHeight;
+    const side = Math.floor(Math.random() * 4);
+    let ox, oy, baseDir;
+    if      (side === 0) { ox = -180;    oy = h*(0.15+Math.random()*0.7); baseDir = 0;   }
+    else if (side === 1) { ox = w+180;   oy = h*(0.15+Math.random()*0.7); baseDir = 180; }
+    else if (side === 2) { ox = w*(0.15+Math.random()*0.7); oy = -180;    baseDir = 90;  }
+    else                 { ox = w*(0.15+Math.random()*0.7); oy = h+180;   baseDir = 270; }
+
+    const num   = 4 + Math.floor(Math.random() * 3);
+    const sweep = Math.random() < 0.5 ? 0 : 1;
+
+    for (let i = 0; i < num; i++) {
+      const t     = num === 1 ? 0.5 : i / (num - 1);
+      const angle = baseDir + (t - 0.5) * 30 + (Math.random() - 0.5) * 5;
+      const len   = 950 + Math.random() * 750;
+      const arc   = 750 + Math.random() * 700;
+      const rad   = angle * Math.PI / 180;
+      const ex    = ox + Math.cos(rad) * len;
+      const ey    = oy + Math.sin(rad) * len;
+
+      const path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute('d', `M ${ox} ${oy} A ${arc} ${arc} 0 0 ${sweep} ${ex} ${ey}`);
+      path.setAttribute('class', 'slash-path');
+      path.setAttribute('stroke', 'url(#slashGrad)');
+      path.setAttribute('stroke-width', String(2.5 + Math.random() * 3.5));
+      svg.appendChild(path);
+
+      const pathLen = path.getTotalLength();
+      path.style.strokeDasharray  = pathLen;
+      path.style.strokeDashoffset = pathLen;
+      path.style.opacity = '0';
+
+      const delay = i * 65;
+      setTimeout(() => {
+        path.style.transition = 'stroke-dashoffset 0.55s cubic-bezier(0.16,0.84,0.24,1), opacity 0.25s ease-out';
+        path.style.opacity    = '1';
+        path.style.strokeDashoffset = '0';
+        setTimeout(() => {
+          path.style.transition = 'opacity 0.75s ease-in, stroke-dashoffset 0.55s';
+          path.style.opacity    = '0';
+          path.style.strokeDashoffset = String(-pathLen * 0.25);
+          setTimeout(() => path.remove(), 800);
+        }, 580);
+      }, delay);
+    }
+    setTimeout(fire, 6500 + Math.random() * 6500);
+  }
+  setTimeout(fire, 6000); // first slash fires after intro clears
+})();
+
+/* =========================================================
+   8. Three.js — surreal void portal, aurora ribbons, petals
+========================================================= */
+(function threeScene() {
+  if (typeof THREE === 'undefined') return;
+
+  const canvas   = document.getElementById('bg');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  const scene  = new THREE.Scene();
+  scene.fog    = new THREE.FogExp2(0x02010a, 0.014);
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 0, 30);
+
+  /* ---- Starfield — 2 layers for depth ---- */
+  function makeStarField(count, radiusMin, radiusMax, crimsonRatio, size, opacity) {
+    const geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(count * 3);
+    const col = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      const r     = radiusMin + Math.random() * (radiusMax - radiusMin);
+      const theta = Math.random() * Math.PI * 2;
+      const phi   = Math.acos(2 * Math.random() - 1);
+      pos[i*3]   = r * Math.sin(phi) * Math.cos(theta);
+      pos[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+      pos[i*3+2] = r * Math.cos(phi);
+      if (Math.random() < crimsonRatio) {
+        col[i*3] = 1.0; col[i*3+1] = 0.18; col[i*3+2] = 0.22;
+      } else if (Math.random() < 0.15) {
+        col[i*3] = 0.72; col[i*3+1] = 0.55; col[i*3+2] = 1.0; // violet
+      } else {
+        const v = 0.65 + Math.random() * 0.35;
+        col[i*3] = v; col[i*3+1] = v * 0.92; col[i*3+2] = v * 0.82;
+      }
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color',    new THREE.BufferAttribute(col, 3));
+    const mat = new THREE.PointsMaterial({
+      size, vertexColors: true, transparent: true, opacity,
+      sizeAttenuation: true, blending: THREE.AdditiveBlending, depthWrite: false
+    });
+    return new THREE.Points(geo, mat);
+  }
+  const starsNear = makeStarField(900,  40,  80, 0.12, 0.9, 0.9);
+  const starsFar  = makeStarField(2400, 80, 200, 0.06, 0.5, 0.7);
+  scene.add(starsNear);
+  scene.add(starsFar);
+
+  /* ---- Void Portal — concentric spinning rings centred in scene ---- */
+  const portalGroup = new THREE.Group();
+  portalGroup.position.set(0, 0, -22);
+  scene.add(portalGroup);
+
+  const ringDefs = [
+    { radius: 7.0,  tube: 0.38, color: 0xff2a3f, opacity: 0.55, rx: 0.30, ry: 0.0,  speed:  0.009 },
+    { radius: 10.5, tube: 0.28, color: 0xd4a945, opacity: 0.40, rx: 0.0,  ry: 0.20, speed: -0.006 },
+    { radius: 13.8, tube: 0.22, color: 0x8b2fc9, opacity: 0.32, rx: 0.55, ry: 0.10, speed:  0.005 },
+    { radius: 17.0, tube: 0.18, color: 0xc8102e, opacity: 0.22, rx: 0.10, ry: 0.45, speed: -0.004 },
+    { radius: 20.5, tube: 0.14, color: 0xf4cb6b, opacity: 0.14, rx: 0.70, ry: 0.0,  speed:  0.003 },
+  ];
+  const rings = ringDefs.map(d => {
+    const geo  = new THREE.TorusGeometry(d.radius, d.tube, 3, 180);
+    const mat  = new THREE.MeshBasicMaterial({
+      color: d.color, transparent: true, opacity: d.opacity,
+      blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = d.rx;
+    mesh.rotation.y = d.ry;
+    mesh.userData.speed = d.speed;
+    portalGroup.add(mesh);
+    return mesh;
+  });
+
+  /* Soft glow disc at portal centre */
+  const discGeo = new THREE.CircleGeometry(5.5, 64);
+  const discMat = new THREE.MeshBasicMaterial({
+    color: 0x3a0050, transparent: true, opacity: 0.28,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+  });
+  portalGroup.add(new THREE.Mesh(discGeo, discMat));
+
+  /* ---- Vortex spiral streaming into portal ---- */
+  const vortexCount = 700;
+  const vortexGeo   = new THREE.BufferGeometry();
+  const vortexPos   = new Float32Array(vortexCount * 3);
+  const vortexCol   = new Float32Array(vortexCount * 3);
+  const vortexAngle = new Float32Array(vortexCount);
+  const vortexR     = new Float32Array(vortexCount);
+  const vortexSpeed = new Float32Array(vortexCount);
+  const vortexArm   = new Float32Array(vortexCount);
+  for (let i = 0; i < vortexCount; i++) {
+    vortexArm[i]   = Math.floor(Math.random() * 3); // 3 spiral arms
+    vortexAngle[i] = Math.random() * Math.PI * 2 + vortexArm[i] * (Math.PI * 2 / 3);
+    vortexR[i]     = 5 + Math.random() * 18;
+    vortexSpeed[i] = (0.004 + Math.random() * 0.008) * (Math.random() < 0.5 ? 1 : -1);
+    const px = Math.cos(vortexAngle[i]) * vortexR[i];
+    const py = Math.sin(vortexAngle[i]) * vortexR[i];
+    const pz = (Math.random() - 0.5) * 4 - 22;
+    vortexPos[i*3] = px; vortexPos[i*3+1] = py; vortexPos[i*3+2] = pz;
+    // colour: inner crimson → outer violet
+    const frac = vortexR[i] / 23;
+    vortexCol[i*3]   = 1.0 - frac * 0.4;
+    vortexCol[i*3+1] = frac * 0.1;
+    vortexCol[i*3+2] = frac * 0.8;
+  }
+  vortexGeo.setAttribute('position', new THREE.BufferAttribute(vortexPos, 3));
+  vortexGeo.setAttribute('color',    new THREE.BufferAttribute(vortexCol, 3));
+  const vortexMat = new THREE.PointsMaterial({
+    size: 0.22, vertexColors: true, transparent: true, opacity: 0.75,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+  });
+  const vortex = new THREE.Points(vortexGeo, vortexMat);
+  scene.add(vortex);
+
+  /* ---- Aurora ribbons — 3D sine arcs spanning the width ---- */
+  const auroraConfigs = [
+    { color: 0x6b10c0, yBase:  8, zPos: -12, amp: 5,  freq: 2.2, speed: 0.28, opacity: 0.38 },
+    { color: 0xc8102e, yBase: -5, zPos: -16, amp: 7,  freq: 1.8, speed: 0.20, opacity: 0.30 },
+    { color: 0xd4a945, yBase:  2, zPos: -19, amp: 4,  freq: 3.0, speed: 0.35, opacity: 0.22 },
+    { color: 0x3b1090, yBase: 12, zPos: -14, amp: 6,  freq: 1.4, speed: 0.18, opacity: 0.26 },
+    { color: 0xff2a3f, yBase: -9, zPos: -10, amp: 3,  freq: 2.6, speed: 0.40, opacity: 0.20 },
+  ];
+  const auroraRibbons = auroraConfigs.map(cfg => {
+    const count = 400;
+    const geo   = new THREE.BufferGeometry();
+    const pos   = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      pos[i*3]   = (i / count - 0.5) * 110;
+      pos[i*3+1] = cfg.yBase + Math.sin((i / count) * Math.PI * cfg.freq) * cfg.amp;
+      pos[i*3+2] = cfg.zPos + Math.cos((i / count) * Math.PI * cfg.freq * 0.5) * 2;
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const mat = new THREE.PointsMaterial({
+      color: cfg.color, size: 0.55, transparent: true, opacity: cfg.opacity,
+      blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+    });
+    const pts = new THREE.Points(geo, mat);
+    pts.userData = { ...cfg, basePos: new Float32Array(pos) };
+    return pts;
+  });
+  auroraRibbons.forEach(r => scene.add(r));
+
+  /* ---- Embers ---- */
+  const emberCount = 180;
+  const emberGeo   = new THREE.BufferGeometry();
+  const emberPos   = new Float32Array(emberCount * 3);
+  const emberSpeed = new Float32Array(emberCount);
+  const emberDrift = new Float32Array(emberCount);
+  for (let i = 0; i < emberCount; i++) {
+    emberPos[i*3]   = (Math.random() - 0.5) * 70;
+    emberPos[i*3+1] = (Math.random() - 0.5) * 70;
+    emberPos[i*3+2] = (Math.random() - 0.5) * 25 - 5;
+    emberSpeed[i]   = 0.018 + Math.random() * 0.055;
+    emberDrift[i]   = Math.random() * Math.PI * 2;
+  }
+  emberGeo.setAttribute('position', new THREE.BufferAttribute(emberPos, 3));
+  const emberMat = new THREE.PointsMaterial({
+    color: 0xff3030, size: 0.28, transparent: true, opacity: 0.75,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const embers = new THREE.Points(emberGeo, emberMat);
+  scene.add(embers);
+
+  /* ---- Blood petals ---- */
+  function makePetalTexture() {
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const ctx = c.getContext('2d');
+    const g = ctx.createRadialGradient(16,16,0,16,16,14);
+    g.addColorStop(0,   'rgba(160,0,28,0.95)');
+    g.addColorStop(0.5, 'rgba(110,0,18,0.55)');
+    g.addColorStop(1,   'rgba(80,0,10,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(16,16,14,0,Math.PI*2); ctx.fill();
+    return new THREE.CanvasTexture(c);
+  }
+  const petalCount = 100;
+  const petalGeo   = new THREE.BufferGeometry();
+  const petalPos   = new Float32Array(petalCount * 3);
+  const petalPhase = new Float32Array(petalCount);
+  const petalSpeed = new Float32Array(petalCount);
+  for (let i = 0; i < petalCount; i++) {
+    petalPos[i*3]   = (Math.random() - 0.5) * 90;
+    petalPos[i*3+1] = (Math.random() - 0.5) * 90;
+    petalPos[i*3+2] = (Math.random() - 0.5) * 20 - 5;
+    petalPhase[i]   = Math.random() * Math.PI * 2;
+    petalSpeed[i]   = 0.007 + Math.random() * 0.013;
+  }
+  petalGeo.setAttribute('position', new THREE.BufferAttribute(petalPos, 3));
+  const petalMat = new THREE.PointsMaterial({
+    map: makePetalTexture(), size: 1.6, transparent: true, opacity: 0.6,
+    blending: THREE.AdditiveBlending, depthWrite: false, alphaTest: 0.01
+  });
+  const petals = new THREE.Points(petalGeo, petalMat);
+  scene.add(petals);
+
+  /* ---- Lights ---- */
+  scene.add(new THREE.AmbientLight(0x1a0838, 0.5));
+  const rimA = new THREE.PointLight(0xc8102e, 1.2, 80);
+  rimA.position.set(-20, 10, 5); scene.add(rimA);
+  const rimB = new THREE.PointLight(0x6b10c0, 0.9, 80);
+  rimB.position.set(20, -8, 5);  scene.add(rimB);
+
+  /* ---- Mouse parallax ---- */
+  let targetX = 0, targetY = 0, mouseX = 0, mouseY = 0;
+  window.addEventListener('mousemove', e => {
+    targetX = (e.clientX / window.innerWidth  - 0.5) * 2;
+    targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+  }, { passive: true });
+
+  /* ---- Animate ---- */
+  const clock  = new THREE.Clock();
+  const htmlEl = document.documentElement;
+
+  function animate() {
+    const t = clock.getElapsedTime();
+
+    /* Portal rings spin on their own axes */
+    rings.forEach((ring, i) => {
+      ring.rotation.z += ringDefs[i].speed;
+      const pulse = 0.85 + Math.sin(t * 0.8 + i * 1.1) * 0.15;
+      ring.material.opacity = ringDefs[i].opacity * pulse;
+    });
+    /* Portal group breathes */
+    const portalBreath = Math.sin(t * 0.4) * 0.06;
+    portalGroup.scale.set(1 + portalBreath, 1 + portalBreath, 1);
+    portalGroup.rotation.z = t * 0.018;
+
+    /* Vortex particles orbit */
+    const vPos = vortex.geometry.attributes.position.array;
+    for (let i = 0; i < vortexCount; i++) {
+      vortexAngle[i] += vortexSpeed[i];
+      /* Pull radius slowly inward, reset when near centre */
+      vortexR[i] -= 0.008;
+      if (vortexR[i] < 1.5) {
+        vortexR[i]     = 10 + Math.random() * 13;
+        vortexAngle[i] = Math.random() * Math.PI * 2 + vortexArm[i] * (Math.PI * 2 / 3);
+      }
+      vPos[i*3]   = Math.cos(vortexAngle[i]) * vortexR[i];
+      vPos[i*3+1] = Math.sin(vortexAngle[i]) * vortexR[i];
+    }
+    vortex.geometry.attributes.position.needsUpdate = true;
+
+    /* Aurora ribbons undulate */
+    auroraRibbons.forEach(ribbon => {
+      const d    = ribbon.userData;
+      const rPos = ribbon.geometry.attributes.position.array;
+      const base = d.basePos;
+      const count = base.length / 3;
+      for (let i = 0; i < count; i++) {
+        rPos[i*3+1] = base[i*3+1] + Math.sin((i / count) * Math.PI * d.freq + t * d.speed) * d.amp * 0.35;
+      }
+      ribbon.geometry.attributes.position.needsUpdate = true;
+      ribbon.material.opacity = d.opacity * (0.7 + Math.sin(t * 0.5 + d.freq) * 0.3);
+    });
+
+    /* Star layers drift */
+    starsNear.rotation.y = t * 0.008;
+    starsNear.rotation.x = t * 0.003;
+    starsFar.rotation.y  = t * 0.004;
+    starsFar.rotation.x  = t * 0.0015;
+
+    /* Embers drift upward */
+    const ePos = embers.geometry.attributes.position.array;
+    for (let i = 0; i < emberCount; i++) {
+      ePos[i*3+1] += emberSpeed[i];
+      ePos[i*3]   += Math.sin(t * 0.6 + emberDrift[i]) * 0.007;
+      if (ePos[i*3+1] > 38) ePos[i*3+1] = -38;
+    }
+    embers.geometry.attributes.position.needsUpdate = true;
+
+    /* Blood petals drift downward */
+    const pPos = petals.geometry.attributes.position.array;
+    for (let i = 0; i < petalCount; i++) {
+      pPos[i*3+1] -= petalSpeed[i];
+      pPos[i*3]   += Math.sin(t * 0.35 + petalPhase[i]) * 0.014;
+      if (pPos[i*3+1] < -45) {
+        pPos[i*3+1] = 45;
+        pPos[i*3]   = (Math.random() - 0.5) * 90;
+      }
+    }
+    petals.geometry.attributes.position.needsUpdate = true;
+
+    /* Lights pulse */
+    rimA.intensity = 1.0 + Math.sin(t * 0.9)  * 0.4;
+    rimB.intensity = 0.8 + Math.sin(t * 0.65 + 1.2) * 0.35;
+
+    /* Background gradient — shifts between deep void hues */
+    const cycle = (Math.sin(t * 0.22) + 1) * 0.5;
+    const r1 = Math.round(20  + cycle * 8);
+    const g1 = Math.round(6   + cycle * 4);
+    const b1 = Math.round(40  + cycle * 20);
+    const pct = Math.round(25 + cycle * 10);
+    htmlEl.style.background =
+      `radial-gradient(ellipse at 50% 40%, rgb(${r1},${g1},${b1}) 0%, #0a0518 ${pct}%, #02010a 100%)`;
+
+    /* Camera parallax */
+    mouseX += (targetX - mouseX) * 0.035;
+    mouseY += (targetY - mouseY) * 0.035;
+    camera.position.x = mouseX * 1.8;
+    camera.position.y = -mouseY * 1.2;
+    camera.lookAt(0, 0, 0);
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+})();
+</script>
+
+</body>
+</html>
